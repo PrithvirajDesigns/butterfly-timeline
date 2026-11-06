@@ -132,6 +132,13 @@
   }
   #labels .end { color: var(--ink); font-weight: 600; }
 
+  #hint {
+    margin-top: 14px; text-align: center;
+    font-size: 12px; color: var(--muted);
+    transition: opacity .4s ease;
+  }
+  #hint.gone { opacity: 0; pointer-events: none; }
+
   @media (max-width: 480px) {
     main { padding-left: 18px; padding-right: 18px; }
     #title { font-size: 19px; }
@@ -164,6 +171,7 @@
       <div id="thumb"></div>
     </div>
     <div id="labels"><span>Day 0</span><span class="end">Day ~30</span></div>
+    <div id="hint" aria-hidden="true">Drag the timeline</div>
   </section>
 </main>
 
@@ -321,6 +329,10 @@ function setFromPointer(e) {
   targetT = clamp01((e.clientX - rect.left) / rect.width);
 }
 let dragging = false;
+const hintEl = document.getElementById('hint');
+const hideHint = () => hintEl && hintEl.classList.add('gone');
+scrubber.addEventListener('pointerdown', hideHint, { once: true });
+scrubber.addEventListener('keydown', hideHint, { once: true });
 scrubber.addEventListener('pointerdown', e => {
   dragging = true;
   scrubber.setPointerCapture(e.pointerId);
