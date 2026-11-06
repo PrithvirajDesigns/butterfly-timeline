@@ -73,7 +73,3 @@ All tunable values are in the `CONFIG` object near the top of `index.html`. Comm
 ## Tech
 
 HTML, CSS and vanilla JavaScript, plus [Three.js](https://threejs.org/) r128.
-
-## License
-
-MIT (add a `LICENSE` file).
