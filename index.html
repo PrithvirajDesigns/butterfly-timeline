@@ -206,6 +206,7 @@ const CONFIG = {
   GROUND_TOP: -2.1,          // height of the grass surface the twigs grow from
   SLAB_DEPTH: 3.4,           // thickness of the floating earth chunk
   SLAB_MARGIN: 4.0,          // grass beyond the outermost twig base
+  HAPTICS: true,             // vibration / tap feedback while scrubbing (phones)
   PROPS: true,               // tufts, flowers, pebbles, mushrooms, fallen twig
   OUTLINE_DEPTH_FACTOR: 1.25, // outline sensitivity (higher = fewer inner outlines). Scales with pixel size.
   MIN_INTERNAL_RES: 150,     // narrow screens use a finer PIXEL_SCALE so the scene keeps >= this many px
@@ -323,10 +324,41 @@ function paintScrubber(t) {
   }
 }
 
+/* haptics: a light tick for every tick mark crossed, a stronger pulse at each stage change.
+   Android/Chrome use navigator.vibrate; iOS 17.4+ Safari gets a tap through a hidden <input switch>. */
+const HAPTICS = CONFIG.HAPTICS !== false;
+const hapticSwitch = (() => {
+  const l = document.createElement('label');
+  l.setAttribute('aria-hidden', 'true');
+  l.style.cssText = 'position:fixed;left:-99px;top:-99px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+  const i = document.createElement('input'); i.type = 'checkbox'; i.setAttribute('switch', ''); i.tabIndex = -1;
+  l.appendChild(i); document.body.appendChild(l); return l;
+})();
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let lastBuzz = 0, lastTick = -1, lastStageIdx = -1;
+function buzz(ms) {
+  if (!HAPTICS || reduceMotion) return;
+  const now = performance.now(); if (now - lastBuzz < 24) return; lastBuzz = now;
+  // every iPhone/iPad browser (Safari, Chrome, Firefox, Edge...) runs on WebKit, so the switch tap works in all of them;
+  // everywhere else the Vibration API is used, and the switch is the fallback if it is missing
+  try {
+    if (IS_IOS || !navigator.vibrate) hapticSwitch.click();
+    else navigator.vibrate(ms);
+  } catch (_) {}
+}
+function hapticFor(t) {
+  const ti = Math.round(t * (ticks.length - 1)), si = STAGES.indexOf(stageAt(t));
+  if (lastTick < 0) { lastTick = ti; lastStageIdx = si; return; }
+  if (si !== lastStageIdx) buzz(18);
+  else if (ti !== lastTick) buzz(5);
+  lastTick = ti; lastStageIdx = si;
+}
+
 /* pointer scrubbing: drag anywhere on the strip */
 function setFromPointer(e) {
   const rect = scrubber.getBoundingClientRect();
   targetT = clamp01((e.clientX - rect.left) / rect.width);
+  hapticFor(targetT);
 }
 let dragging = false;
 const hintEl = document.getElementById('hint');
@@ -335,6 +367,7 @@ scrubber.addEventListener('pointerdown', hideHint, { once: true });
 scrubber.addEventListener('keydown', hideHint, { once: true });
 scrubber.addEventListener('pointerdown', e => {
   dragging = true;
+  lastTick = -1; buzz(8);
   scrubber.setPointerCapture(e.pointerId);
   scrubber.focus({ preventScroll: true });
   setFromPointer(e);
@@ -361,7 +394,7 @@ scrubber.addEventListener('keydown', e => {
     case 'End':  targetT = 1; break;
     default: handled = false;
   }
-  if (handled) e.preventDefault();
+  if (handled) { e.preventDefault(); hapticFor(targetT); }
 });
 
 /* =====================================================================
